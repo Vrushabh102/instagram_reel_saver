@@ -1,10 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:instagram_reel_saver/services/Downloader.dart';
 import 'package:instagram_reel_saver/services/Fetch.dart';
-import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:flutter_file_downloader/flutter_file_downloader.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,74 +13,101 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late StreamSubscription _intentSubscription;
 
-  final _files = <SharedMediaFile>[];
-  String? url = '';
-  String? downloaderUri;
+  Color bgcolor = Colors.white24;
+  bool _useListenerLink = false;
 
-  // form key
-  var formKey = GlobalKey<FormState>();
+  String? url;
+  String? linkThroughListener;
+
+  // to track the download progress
+  double? _progress;
+
 
   @override
   void initState() {
     super.initState();
+    print('initState started');
 
-    // receiving url while app is opened
-    _intentSubscription =
-        ReceiveSharingIntent.getMediaStream().listen((event) {
-          setState(() {
-            _files.clear();
-            _files.addAll(event);
-            url = _files[0].path.toString();
-          });
-        },
-          onError: (error) {
-      });
 
-    // receiving url when app is closed
-    ReceiveSharingIntent.getInitialMedia().then((value){
+    ReceiveSharingIntent.getInitialMedia().then((value) {
       setState(() {
-        _files.clear();
-        _files.addAll(value);
-        url = _files[0].path.toString();
+
+        try {
+          linkThroughListener = value[0].path.toString();
+          print('url $url');
+          print('value is ${value[0].path}');
+
+          // pass the link to the textFormField if link is received from receive sharing intent
+          if(linkThroughListener != null) {
+            _controller.text = linkThroughListener!;
+          }
+        } catch(error) {
+          print('error occured $error');
+        }
+
+        // Tell the library that we are done processing the intent.
+        ReceiveSharingIntent.reset();
       });
     });
-    ReceiveSharingIntent.reset();
-
   }
 
-  @override
-  void dispose() {
-    _intentSubscription.cancel();
-    super.dispose();
+  void showSnackbar(String message) {
+    print('showsnackbar called');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      )
+    );
   }
 
+  // form key
+  var formKey = GlobalKey<FormState>();
+
+  final TextEditingController _controller = TextEditingController();
   Widget _buildTextFormField() {
-    return TextFormField(
-      decoration: const InputDecoration(
-            hintText: 'Enter Url',
-            contentPadding: EdgeInsets.all(20),
-            border: OutlineInputBorder(
-              borderSide: BorderSide(
-                color: Colors.orange,
-                width: 10,
-              ),
-              borderRadius: BorderRadius.all(Radius.circular(20)),
-            )
-        ),
-      controller: TextEditingController(text: url),
-      validator: (value) {
-        if(value == null || value.isEmpty) {
-          return 'Paste the Video Link';
-        } else if(true) {
-          //Todo: url validation
-        }
-        return null;
-      },
-      onSaved: (value) {
-        url = value;
-      },
+    return Form(
+      key: formKey,
+      child: Padding(
+        padding: const EdgeInsets.all(4.0),
+        child: TextFormField(
+          controller: _controller,
+          decoration: const InputDecoration(
+              hintText: 'Enter Url',
+              contentPadding: EdgeInsets.all(20),
+              border: OutlineInputBorder(
+                borderSide: BorderSide(
+                  color: Colors.orange,
+                  width: 10,
+                ),
+                borderRadius: BorderRadius.all(Radius.circular(20)),
+              )
+          ),
+          onChanged: (value) {
+            _useListenerLink = false;
+          },
+          validator: (value) {
+
+            print('value is $value');
+            if (value == null || value.isEmpty) {
+              return 'Please provide a link.';
+            } else {
+              Uri? uri = Uri.tryParse(value);
+              if (uri == null || uri.scheme.isEmpty || uri.host.isEmpty) {
+                return 'Invalid URL';
+              } else if (!value.contains('www.instagram.com') || !value.contains('reel')) {
+                return 'Please provide a valid Instagram reel link.';
+              }
+            }
+            return null;
+          },
+          onSaved: (value) {
+            url = value;
+            print('onsaved $url');
+          },
+        ), // TextFormField for entering url
+      ),
     );
   }
 
@@ -93,13 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Container(
               width: 385,
               margin: const EdgeInsets.all(4),
-              child: Form(
-                key: formKey,
-                child: Padding(
-                  padding: const EdgeInsets.all(4.0),
-                  child: _buildTextFormField(), // TextFormField for entering url
-                ),
-              ),
+              child: _buildTextFormField(),
             )
         ),
       ],
@@ -107,12 +127,39 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // return string url of the downloadable video file
-  Future<String> _downloadData() async{
+  Future<String> _downloadData(String link) async{
     // this function will only be called when the link provided is valid
-    Fetch fetchInstance = Fetch(queryUrl: url);
+    Fetch fetchInstance = Fetch(queryUrl: link);
     await fetchInstance.fetchData();
     String? downloadUrl = fetchInstance.finalUrl;
     return downloadUrl.toString();
+  }
+
+  // function to download the video from provided url
+  void downloadVideo(String downloadableUrl) {
+    String defaultFileName = 'Instagram Reel';
+
+    FileDownloader.downloadFile(
+      url: downloadableUrl,
+      onDownloadError: (String error) {
+        showSnackbar('Error');
+      },
+      onDownloadCompleted: (String path) {
+        print('download completed');
+        showSnackbar('Downloaded at $path');
+        setState(() {
+          _progress = null;
+        });
+      },
+      name: defaultFileName,
+      onProgress: (fileName, progress) {
+        print('progress is $progress');
+        setState(() {
+          _progress = progress;
+        });
+      },
+      notificationType: NotificationType.all,
+    );
   }
 
   // Main Build Function
@@ -134,35 +181,37 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
 
       body: Container(
-        color: Colors.white24,
-
-        padding: const EdgeInsets.all(16),
+        color: bgcolor,
+        padding: const EdgeInsets.all(10),
 
         // parent column
         child: Column(
           children: [
-
             // Row for TextFormField
             _buildFirstRow(),
-
             // validation button
-            ElevatedButton(
+            _progress != null ? const CircularProgressIndicator() : ElevatedButton(
               onPressed: () async {
+
                   if(formKey.currentState!.validate()) {
                     formKey.currentState!.save();
-                    String downloadableUrl = await _downloadData();
+
+                    String downloadableUrl = await _downloadData(_controller.text);
                     // function to download the video
-                    Downloader downloaderInstance = Downloader(url: downloadableUrl);
-                    downloaderInstance.downloadVideo();
+                    downloadVideo(downloadableUrl);
                   }
               },
-              child: const Text('Download',style: TextStyle(fontSize: 30),),
+              child: const Text('Download',style: TextStyle(fontSize: 20),),
             ),
-
           ],
         ),
       ),
     );
   }
-}
 
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+}

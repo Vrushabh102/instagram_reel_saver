@@ -5,7 +5,7 @@ import 'package:http/http.dart';
 class Fetch {
 
   String? queryUrl;
-  // Constructor that is use to pass query url whenever Fetch instance is created
+  // Constructor to pass query url whenever Fetch instance is created
   Fetch({required this.queryUrl});
 
   // api endpoint
@@ -32,8 +32,5 @@ class Fetch {
     } catch(error) {
         finalUrl = 'some error has occurred';
     }
-
   }
-
-
 }
