@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:instagram_reel_saver/services/Fetch.dart';
 import 'package:flutter_file_downloader/flutter_file_downloader.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+import 'package:instagram_reel_saver/interface/inputdecoration.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,53 +15,86 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-
-  Color bgcolor = Colors.white24;
-  bool _useListenerLink = false;
-
   String? url;
   String? linkThroughListener;
 
   // to track the download progress
   double? _progress;
 
+  bool showPasteButtonOrNot = false;
+  bool isClipboardTextValid = false;
+
+
+  ClipboardData? data;
 
   @override
-  void initState() {
+  void initState()  {
     super.initState();
-    print('initState started');
 
+
+    getClipboardData();
 
     ReceiveSharingIntent.getInitialMedia().then((value) {
       setState(() {
-
         try {
           linkThroughListener = value[0].path.toString();
-          print('url $url');
-          print('value is ${value[0].path}');
 
           // pass the link to the textFormField if link is received from receive sharing intent
-          if(linkThroughListener != null) {
+          if (linkThroughListener != null) {
             _controller.text = linkThroughListener!;
           }
-        } catch(error) {
-          print('error occured $error');
+        } catch (error) {
+          print('received intent sharing error $error');
         }
 
-        // Tell the library that we are done processing the intent.
         ReceiveSharingIntent.reset();
       });
     });
   }
 
-  void showSnackbar(String message) {
-    print('showsnackbar called');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      )
+  bool validateCLipBoardUri(String? value) {
+    if (value == null || value.isEmpty) {
+      return false;
+    } else {
+      Uri? uri = Uri.tryParse(value);
+      if (uri == null || uri.scheme.isEmpty || uri.host.isEmpty) {
+        return false;
+      } else if (!value.contains('www.instagram.com') ||
+          !value.contains('reel')) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void getClipboardData() async {
+    data = await Clipboard.getData('text/plain');
+    if(data != null) {
+      setState(() {
+        showPasteButtonOrNot = true;
+        print('clipboard data printed ${data!.text}');
+        isClipboardTextValid = validateCLipBoardUri(data!.text);
+      });
+    }
+  }
+
+
+  Widget showPasteButton(String url) {
+    return ElevatedButton(
+      onPressed: () {
+        setState(() {
+          _controller.text = url;
+        });
+      },
+      child: const Icon(Icons.paste_rounded),
     );
+  }
+
+  void showSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 
   // form key
@@ -67,36 +102,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final TextEditingController _controller = TextEditingController();
   Widget _buildTextFormField() {
+    // Instance of Ui clas to build the ui for InputTextField
+    Ui buildUi = Ui();
     return Form(
       key: formKey,
       child: Padding(
         padding: const EdgeInsets.all(4.0),
         child: TextFormField(
           controller: _controller,
-          decoration: const InputDecoration(
-              hintText: 'Enter Url',
-              contentPadding: EdgeInsets.all(20),
-              border: OutlineInputBorder(
-                borderSide: BorderSide(
-                  color: Colors.orange,
-                  width: 10,
-                ),
-                borderRadius: BorderRadius.all(Radius.circular(20)),
-              )
-          ),
+          decoration: buildUi.buildInputDecoration(),
           onChanged: (value) {
-            _useListenerLink = false;
+            setState(() {
+              _buildFirstRow();
+            });
           },
           validator: (value) {
-
-            print('value is $value');
             if (value == null || value.isEmpty) {
               return 'Please provide a link.';
             } else {
               Uri? uri = Uri.tryParse(value);
               if (uri == null || uri.scheme.isEmpty || uri.host.isEmpty) {
                 return 'Invalid URL';
-              } else if (!value.contains('www.instagram.com') || !value.contains('reel')) {
+              } else if (!value.contains('www.instagram.com') ||
+                  !value.contains('reel')) {
                 return 'Please provide a valid Instagram reel link.';
               }
             }
@@ -104,9 +132,8 @@ class _HomeScreenState extends State<HomeScreen> {
           },
           onSaved: (value) {
             url = value;
-            print('onsaved $url');
           },
-        ), // TextFormField for entering url
+        ),
       ),
     );
   }
@@ -117,17 +144,25 @@ class _HomeScreenState extends State<HomeScreen> {
         // TextInputField
         Expanded(
             child: Container(
-              width: 385,
-              margin: const EdgeInsets.all(4),
-              child: _buildTextFormField(),
-            )
-        ),
+          width: 385,
+          margin: const EdgeInsets.all(4),
+          child: _buildTextFormField(),
+        )),
+        if (_controller.text != '')
+          ElevatedButton(
+            onPressed: () async {
+              setState(() {
+                _controller.text = '';
+              });
+            },
+            child: const Icon(Icons.clear),
+          ),
       ],
     );
   }
 
   // return string url of the downloadable video file
-  Future<String> _downloadData(String link) async{
+  Future<String> _downloadData(String link) async {
     // this function will only be called when the link provided is valid
     Fetch fetchInstance = Fetch(queryUrl: link);
     await fetchInstance.fetchData();
@@ -145,7 +180,6 @@ class _HomeScreenState extends State<HomeScreen> {
         showSnackbar('Error');
       },
       onDownloadCompleted: (String path) {
-        print('download completed');
         showSnackbar('Downloaded at $path');
         setState(() {
           _progress = null;
@@ -153,7 +187,6 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       name: defaultFileName,
       onProgress: (fileName, progress) {
-        print('progress is $progress');
         setState(() {
           _progress = progress;
         });
@@ -165,10 +198,15 @@ class _HomeScreenState extends State<HomeScreen> {
   // Main Build Function
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reel Saver',style: TextStyle(color: Colors.white,fontWeight: FontWeight.bold,letterSpacing: 1.2),),
+        title: const Text(
+          'Reel Saver',
+          style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2),
+        ),
         backgroundColor: Colors.red[600],
         iconTheme: const IconThemeData(color: Colors.white),
         bottom: PreferredSize(
@@ -179,9 +217,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-
       body: Container(
-        color: bgcolor,
+        color: Colors.white38,
         padding: const EdgeInsets.all(10),
 
         // parent column
@@ -189,19 +226,29 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             // Row for TextFormField
             _buildFirstRow(),
+
+            if(showPasteButtonOrNot && isClipboardTextValid) showPasteButton(data!.text.toString()),
             // validation button
             _progress != null ? const CircularProgressIndicator() : ElevatedButton(
               onPressed: () async {
+                print('heeeefjdlkfjdklfjkldfjkldjlfk');
+                ClipboardData? data = await Clipboard.getData('text/plain');
+                if (data != null) {
+                  print(data.text);
+                }
+                if (formKey.currentState!.validate()) {
+                  formKey.currentState!.save();
 
-                  if(formKey.currentState!.validate()) {
-                    formKey.currentState!.save();
-
-                    String downloadableUrl = await _downloadData(_controller.text);
-                    // function to download the video
-                    downloadVideo(downloadableUrl);
-                  }
+                  String downloadableUrl =
+                      await _downloadData(_controller.text);
+                  // function to download the video
+                  downloadVideo(downloadableUrl);
+                }
               },
-              child: const Text('Download',style: TextStyle(fontSize: 20),),
+              child: const Text(
+                'Download',
+                style: TextStyle(fontSize: 20),
+              ),
             ),
           ],
         ),
