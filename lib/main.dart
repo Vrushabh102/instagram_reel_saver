@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:instagram_reel_saver/screens/HomeScreen.dart';
+import 'package:instagram_reel_saver/screens/home_screen.dart';
 
 void main(){
   runApp(

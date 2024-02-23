@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:instagram_reel_saver/services/Fetch.dart';
 import 'package:flutter_file_downloader/flutter_file_downloader.dart';
+import 'package:instagram_reel_saver/styles/button.dart';
+import 'package:instagram_reel_saver/styles/text.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
-import 'package:instagram_reel_saver/interface/inputdecoration.dart';
+import 'package:instagram_reel_saver/styles/input_decoration.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,7 +17,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    implements WidgetsBindingObserver {
   String? url;
   String? linkThroughListener;
 
@@ -22,15 +26,15 @@ class _HomeScreenState extends State<HomeScreen> {
   double? _progress;
 
   bool showPasteButtonOrNot = false;
-  bool isClipboardTextValid = false;
-
 
   ClipboardData? data;
+  bool isClipBoardNull = false;
 
   @override
-  void initState()  {
+  void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addObserver(this);
 
     getClipboardData();
 
@@ -43,50 +47,39 @@ class _HomeScreenState extends State<HomeScreen> {
           if (linkThroughListener != null) {
             _controller.text = linkThroughListener!;
           }
-        } catch (error) {
-          print('received intent sharing error $error');
         }
-
+        catch(error) {
+          // do nothing
+        }
         ReceiveSharingIntent.reset();
       });
     });
   }
 
-  bool validateCLipBoardUri(String? value) {
-    if (value == null || value.isEmpty) {
-      return false;
-    } else {
-      Uri? uri = Uri.tryParse(value);
-      if (uri == null || uri.scheme.isEmpty || uri.host.isEmpty) {
-        return false;
-      } else if (!value.contains('www.instagram.com') ||
-          !value.contains('reel')) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  void getClipboardData() async {
+  getClipboardData() async {
     data = await Clipboard.getData('text/plain');
-    if(data != null) {
+    if (data != null) {
       setState(() {
         showPasteButtonOrNot = true;
-        print('clipboard data printed ${data!.text}');
-        isClipboardTextValid = validateCLipBoardUri(data!.text);
       });
     }
   }
 
-
-  Widget showPasteButton(String url) {
+  Widget showPasteButton(String url, BuildContext context) {
+    isClipBoardNull = (data != null);
     return ElevatedButton(
-      onPressed: () {
-        setState(() {
-          _controller.text = url;
-        });
-      },
-      child: const Icon(Icons.paste_rounded),
+      onPressed: isClipBoardNull
+          ? () {
+              setState(() {
+                _controller.text = url;
+              });
+            }
+          : null,
+      style: isClipBoardNull ? validPasteButtonStyle : inValidPasteButtonStyle,
+      child: const Icon(
+        Icons.paste_rounded,
+        color: Colors.white,
+      ),
     );
   }
 
@@ -113,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
           decoration: buildUi.buildInputDecoration(),
           onChanged: (value) {
             setState(() {
-              _buildFirstRow();
+              _buildFirstRow(context);
             });
           },
           validator: (value) {
@@ -138,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFirstRow() {
+  Widget _buildFirstRow(BuildContext context) {
     return Row(
       children: [
         // TextInputField
@@ -149,13 +142,21 @@ class _HomeScreenState extends State<HomeScreen> {
           child: _buildTextFormField(),
         )),
         if (_controller.text != '')
-          ElevatedButton(
+          IconButton(
             onPressed: () async {
               setState(() {
                 _controller.text = '';
               });
             },
-            child: const Icon(Icons.clear),
+            style: downloadButtonStyle.copyWith(
+                minimumSize: MaterialStatePropertyAll(
+              Size(MediaQuery.of(context).size.width * 0.18,
+                  MediaQuery.of(context).size.height * 0.065),
+            )),
+            icon: const Icon(
+              Icons.clear,
+              color: Colors.white,
+            ),
           ),
       ],
     );
@@ -178,6 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
       url: downloadableUrl,
       onDownloadError: (String error) {
         showSnackbar('Error');
+        _progress = null;
       },
       onDownloadCompleted: (String path) {
         showSnackbar('Downloaded at $path');
@@ -195,11 +197,29 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  @override
+  void dispose() {
+    _controller.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) async {
+    await getClipboardData();
+    setState(() {
+      _controller.text = _controller.text;
+    });
+  }
+
   // Main Build Function
   @override
   Widget build(BuildContext context) {
+    var height = MediaQuery.of(context).size.height;
+    var width = MediaQuery.of(context).size.width;
     return Scaffold(
       appBar: AppBar(
+        // todo appbar customizations
         title: const Text(
           'Reel Saver',
           style: TextStyle(
@@ -225,31 +245,44 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             // Row for TextFormField
-            _buildFirstRow(),
+            _buildFirstRow(context),
 
-            if(showPasteButtonOrNot && isClipboardTextValid) showPasteButton(data!.text.toString()),
-            // validation button
-            _progress != null ? const CircularProgressIndicator() : ElevatedButton(
-              onPressed: () async {
-                print('heeeefjdlkfjdklfjkldfjkldjlfk');
-                ClipboardData? data = await Clipboard.getData('text/plain');
-                if (data != null) {
-                  print(data.text);
-                }
-                if (formKey.currentState!.validate()) {
-                  formKey.currentState!.save();
-
-                  String downloadableUrl =
-                      await _downloadData(_controller.text);
-                  // function to download the video
-                  downloadVideo(downloadableUrl);
-                }
-              },
-              child: const Text(
-                'Download',
-                style: TextStyle(fontSize: 20),
-              ),
+            if (data != null)
+              // paste button to paste text from pasted from the clipboard
+              showPasteButton(data!.text.toString(), context),
+            const SizedBox(
+              height: 10,
             ),
+
+            // download button with validation
+            _progress != null
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
+                    onPressed: () async {
+                      ClipboardData? data =
+                          await Clipboard.getData('text/plain');
+                      if (data != null) {
+                      }
+                      if (formKey.currentState!.validate()) {
+                        formKey.currentState!.save();
+
+                        String downloadableUrl =
+                            await _downloadData(_controller.text);
+                        // function to download the video
+                        downloadVideo(downloadableUrl);
+                      }
+                    },
+                    // using buttonStyle from created styles
+                    style: downloadButtonStyle.copyWith(
+                        minimumSize: MaterialStatePropertyAll(
+                            Size(width * 0.9, height * 0.06))),
+
+                    child: const Text(
+                      'Download',
+                      //style: TextStyle(fontSize: 20, color: Colors.white),
+                      style: downloadButtonTextStyle,
+                    ),
+                  ),
           ],
         ),
       ),
@@ -257,8 +290,40 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  void didChangeAccessibilityFeatures() {}
+
+  @override
+  void didChangeLocales(List<Locale>? locales) {}
+
+  @override
+  void didChangeMetrics() {}
+
+  @override
+  void didChangePlatformBrightness() {}
+
+  @override
+  void didChangeTextScaleFactor() {}
+
+  @override
+  void didHaveMemoryPressure() {}
+
+  @override
+  Future<bool> didPopRoute() {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<bool> didPushRoute(String route) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<bool> didPushRouteInformation(RouteInformation routeInformation) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AppExitResponse> didRequestAppExit() {
+    throw UnimplementedError();
   }
 }
