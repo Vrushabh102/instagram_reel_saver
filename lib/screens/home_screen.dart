@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:instagram_reel_saver/services/Fetch.dart';
 import 'package:flutter_file_downloader/flutter_file_downloader.dart';
 import 'package:instagram_reel_saver/styles/button.dart';
-import 'package:instagram_reel_saver/styles/text.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:instagram_reel_saver/styles/input_decoration.dart';
 
@@ -28,7 +27,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool showPasteButtonOrNot = false;
 
   ClipboardData? data;
-  bool isClipBoardNull = false;
+  bool isClipBoardNull = true;
 
   @override
   void initState() {
@@ -47,8 +46,7 @@ class _HomeScreenState extends State<HomeScreen>
           if (linkThroughListener != null) {
             _controller.text = linkThroughListener!;
           }
-        }
-        catch(error) {
+        } catch (error) {
           // do nothing
         }
         ReceiveSharingIntent.reset();
@@ -61,32 +59,53 @@ class _HomeScreenState extends State<HomeScreen>
     if (data != null) {
       setState(() {
         showPasteButtonOrNot = true;
+        isClipBoardNull = false;
       });
     }
   }
 
-  Widget showPasteButton(String url, BuildContext context) {
-    isClipBoardNull = (data != null);
+  Widget showPasteButton(BuildContext context) {
     return ElevatedButton(
-      onPressed: isClipBoardNull
-          ? () {
-              setState(() {
-                _controller.text = url;
-              });
-            }
-          : null,
-      style: isClipBoardNull ? validPasteButtonStyle : inValidPasteButtonStyle,
-      child: const Icon(
-        Icons.paste_rounded,
-        color: Colors.white,
-      ),
-    );
+        onPressed: showPasteButtonOrNot
+            ? () {
+                setState(() {
+                  _controller.text = data!.text.toString();
+                });
+              }
+            : null,
+        style: isClipBoardNull
+            ? invalidPasteButtonStyle(context).copyWith(
+                backgroundColor: MaterialStatePropertyAll(
+                    Theme.of(context).brightness == Brightness.light
+                        ? Colors.grey[300]
+                        : Colors.grey[400]))
+            : validPasteButtonStyle(context),
+        child: const Text(
+          'PASTE',
+          style: TextStyle(
+              color: Colors.white,
+              letterSpacing: 1.5,
+              fontFamily: 'Urbanist',
+              fontSize: 16),
+        ));
   }
 
   void showSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message),
+      content: Container(
+        padding: const EdgeInsets.fromLTRB(25, 16, 16, 16),
+        decoration: const BoxDecoration(
+          color: const Color.fromARGB(255, 225, 54, 111),
+          borderRadius: BorderRadius.all(Radius.circular(18)),
+        ),
+        child: Text(
+          message,
+          style: const TextStyle(color: Colors.white, fontSize: 17),
+        ),
+      ),
       behavior: SnackBarBehavior.floating,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
     ));
   }
 
@@ -96,68 +115,60 @@ class _HomeScreenState extends State<HomeScreen>
   final TextEditingController _controller = TextEditingController();
   Widget _buildTextFormField() {
     // Instance of Ui clas to build the ui for InputTextField
-    Ui buildUi = Ui();
     return Form(
       key: formKey,
-      child: Padding(
-        padding: const EdgeInsets.all(4.0),
-        child: TextFormField(
-          controller: _controller,
-          decoration: buildUi.buildInputDecoration(),
-          onChanged: (value) {
-            setState(() {
-              _buildFirstRow(context);
-            });
-          },
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please provide a link.';
-            } else {
-              Uri? uri = Uri.tryParse(value);
-              if (uri == null || uri.scheme.isEmpty || uri.host.isEmpty) {
-                return 'Invalid URL';
-              } else if (!value.contains('www.instagram.com') ||
-                  !value.contains('reel')) {
-                return 'Please provide a valid Instagram reel link.';
-              }
+      child: TextFormField(
+        controller: _controller,
+        decoration: buildInputDecoration(context).copyWith(
+            suffixIcon: _controller.text != ''
+                ? IconButton(
+                    onPressed: () {
+                      setState(() {
+                        _controller.text = '';
+                      });
+                    },
+                    icon: Icon(
+                      Icons.clear,
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? Colors.black
+                          : Colors.white,
+                    ))
+                : null),
+        onChanged: (value) {
+          setState(() {
+            _buildFirstRow();
+          });
+        },
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please provide a link.';
+          } else {
+            Uri? uri = Uri.tryParse(value);
+            if (uri == null || uri.scheme.isEmpty || uri.host.isEmpty) {
+              return 'Invalid URL';
+            } else if (!value.contains('www.instagram.com') ||
+                !value.contains('reel')) {
+              return 'Please provide a valid Instagram reel link.';
             }
-            return null;
-          },
-          onSaved: (value) {
-            url = value;
-          },
-        ),
+          }
+          return null;
+        },
+        onSaved: (value) {
+          url = value;
+        },
       ),
     );
   }
 
-  Widget _buildFirstRow(BuildContext context) {
+  Widget _buildFirstRow() {
     return Row(
       children: [
         // TextInputField
         Expanded(
             child: Container(
-          width: 385,
           margin: const EdgeInsets.all(4),
           child: _buildTextFormField(),
         )),
-        if (_controller.text != '')
-          IconButton(
-            onPressed: () async {
-              setState(() {
-                _controller.text = '';
-              });
-            },
-            style: downloadButtonStyle.copyWith(
-                minimumSize: MaterialStatePropertyAll(
-              Size(MediaQuery.of(context).size.width * 0.18,
-                  MediaQuery.of(context).size.height * 0.065),
-            )),
-            icon: const Icon(
-              Icons.clear,
-              color: Colors.white,
-            ),
-          ),
       ],
     );
   }
@@ -173,8 +184,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   // function to download the video from provided url
   void downloadVideo(String downloadableUrl) {
-    String defaultFileName = 'Instagram Reel';
-
     FileDownloader.downloadFile(
       url: downloadableUrl,
       onDownloadError: (String error) {
@@ -182,12 +191,12 @@ class _HomeScreenState extends State<HomeScreen>
         _progress = null;
       },
       onDownloadCompleted: (String path) {
-        showSnackbar('Downloaded at $path');
+        showSnackbar('Downloaded Successfully');
         setState(() {
           _progress = null;
         });
       },
-      name: defaultFileName,
+      name: DateTime.now().microsecondsSinceEpoch.toString(),
       onProgress: (fileName, progress) {
         setState(() {
           _progress = progress;
@@ -215,54 +224,46 @@ class _HomeScreenState extends State<HomeScreen>
   // Main Build Function
   @override
   Widget build(BuildContext context) {
-    var height = MediaQuery.of(context).size.height;
-    var width = MediaQuery.of(context).size.width;
     return Scaffold(
       appBar: AppBar(
-        // todo appbar customizations
+        foregroundColor: Colors.white,
+        backgroundColor: const Color.fromARGB(255, 225, 54, 111),
         title: const Text(
-          'Reel Saver',
+          'Instagram Reel Saver',
           style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2),
-        ),
-        backgroundColor: Colors.red[600],
-        iconTheme: const IconThemeData(color: Colors.white),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(4.0),
-          child: Container(
-            color: Colors.black,
-            height: 1,
-          ),
+              fontFamily: 'Urbanist',
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.w500),
         ),
       ),
       body: Container(
-        color: Colors.white38,
+        color: Theme.of(context).brightness == Brightness.light
+            ? Colors.grey[100]
+            : const Color.fromARGB(255, 18, 17, 17),
         padding: const EdgeInsets.all(10),
 
         // parent column
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
+            const SizedBox(height: 10),
             // Row for TextFormField
-            _buildFirstRow(context),
+            _buildFirstRow(),
 
-            if (data != null)
-              // paste button to paste text from pasted from the clipboard
-              showPasteButton(data!.text.toString(), context),
-            const SizedBox(
-              height: 10,
-            ),
+            const SizedBox(height: 10),
+            // paste button to paste text from pasted from the clipboard
+            showPasteButton(context),
+            const SizedBox(height: 15),
 
             // download button with validation
             _progress != null
-                ? const CircularProgressIndicator()
+                ? const CircularProgressIndicator(
+                    color: const Color.fromARGB(255, 202, 75, 118))
                 : ElevatedButton(
                     onPressed: () async {
                       ClipboardData? data =
                           await Clipboard.getData('text/plain');
-                      if (data != null) {
-                      }
+                      if (data != null) {}
                       if (formKey.currentState!.validate()) {
                         formKey.currentState!.save();
 
@@ -273,14 +274,14 @@ class _HomeScreenState extends State<HomeScreen>
                       }
                     },
                     // using buttonStyle from created styles
-                    style: downloadButtonStyle.copyWith(
-                        minimumSize: MaterialStatePropertyAll(
-                            Size(width * 0.9, height * 0.06))),
-
+                    style: downloadButtonStyle(context),
                     child: const Text(
-                      'Download',
+                      'DOWNLOAD',
                       //style: TextStyle(fontSize: 20, color: Colors.white),
-                      style: downloadButtonTextStyle,
+                      style: TextStyle(
+                          color: Colors.white,
+                          letterSpacing: 1.5,
+                          fontSize: 15),
                     ),
                   ),
           ],

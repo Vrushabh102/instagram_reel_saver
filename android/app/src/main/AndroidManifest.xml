@@ -6,7 +6,7 @@
 
 
     <application
-        android:label="instagram_reel_saver"
+        android:label="Instagram Reel Saver"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -39,10 +39,17 @@ dependencies:
   cupertino_icons: ^1.0.2
   receive_sharing_intent: ^1.6.7
   flutter_file_downloader: ^1.2.1
+  flutter_launcher_icons: ^0.13.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+flutter_icons:
+  android: true
+  image_path: 'assets/logo.png'
+  adaptive_icon_background: '#181918'
+
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
