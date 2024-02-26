@@ -1,16 +1,22 @@
-# instagram_reel_saver
 
-A new Flutter project.
+<img src="https://github.com/Vrushabh102/instagram_reel_saver/blob/main/assets/logo.png" width="50" height="50">
+<h3>Instagram Reel Saver </h3>
+Created a Flutter application to download Instagram Reels using their respective URLs.
 
-## Getting Started
 
-This project is a starting point for a Flutter application.
+## Screenshots
 
-A few resources to get you started if this is your first Flutter project:
+<div style="padding-top: 8px; padding-bottom: 8px; padding-left: 16px; padding-right: 16px;">
+    <img src="https://github.com/Vrushabh102/instagram_reel_saver/blob/main/Releases/Screenshots/1.jpg" width="197" height="380">
+    <img src="https://github.com/Vrushabh102/instagram_reel_saver/blob/main/Releases/Screenshots/2.jpg" width="197" height="380">
+    <img src="https://github.com/Vrushabh102/instagram_reel_saver/blob/main/Releases/Screenshots/3.jpg" width="197" height="380">
+    <img src="https://github.com/Vrushabh102/instagram_reel_saver/blob/main/Releases/Screenshots/4.jpg" width="197" height="380">
+    
+</div>
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+<br>
+<h4>or share the link from Instagram</h4>
+<div>
+    <img src="https://github.com/Vrushabh102/instagram_reel_saver/blob/main/Releases/Screenshots/2.1.jpg" width="197" height="380">
+    <img src="https://github.com/Vrushabh102/instagram_reel_saver/blob/main/Releases/Screenshots/2.2.jpg" width="197" height="380">
+</div>
